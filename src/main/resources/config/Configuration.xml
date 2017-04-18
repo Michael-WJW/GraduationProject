@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <!--<typeAliases>-->
+        <!--<typeAlias alias="User"  type="undact.model.User"/>-->
+        <!--<typeAlias alias="Activity"  type="undact.model.Activity"/>-->
+        <!--<typeAlias alias="Community"  type="undact.model.Community"/>-->
+        <!--<typeAlias alias="School"  type="undact.model.School"/>-->
+        <!--<typeAlias alias="City"  type="undact.model.City"/>-->
+        <!--<typeAlias alias="Comment"  type="undact.model.Comment"/>-->
+    <!--</typeAliases>-->
+</configuration>
