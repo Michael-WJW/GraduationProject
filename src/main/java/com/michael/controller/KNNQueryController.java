@@ -36,15 +36,17 @@ public class KNNQueryController {
     private static Configuration conf = null;
     private static Connection connection;
     private static HBaseAdmin admin;
-    private static final byte[] TABLE_NAME = "GlobalData".getBytes();
+    private static final byte[] TABLE_NAME = "GlobalDataBulkLoad".getBytes();
     private static final byte[] REGION_TABLE_NAME = "RegionData".getBytes();
     private static final byte[] FAMILY_NAME = "info".getBytes();
     private static final byte[] GEOHASHSTR = "geohashstr".getBytes();
     private static final byte[] LATITUDE = "latitude".getBytes();
     private static final byte[] LONGITUDE = "longitude".getBytes();
-    private static final Path JARPATH = new Path("hdfs:///HBaseSeondIndexServer10.jar");
+    private static final Path JARPATH = new Path("hdfs:///HBaseSeondIndexServer19.jar");
     static {
         conf = HBaseConfiguration.create();
+        conf.setInt("hbase.rpc.timeout",180000);
+        conf.setInt("hbase.client.scanner.timeout.period",180000);
         try {
             connection = ConnectionFactory.createConnection(conf);
             admin = new HBaseAdmin(conf);
@@ -140,7 +142,7 @@ public class KNNQueryController {
     }
     private List<Point> KNNWithoutIndex(Deque<NeighbourPoint> deque, int k) throws IOException {
 //        HTableInterface table = connection.getTable(TABLE_NAME);
-        //纬度:38.5111　经度:-96.8005
+        //纬度:35.9　经度:48.9
         Table table = connection.getTable(TableName.valueOf(TABLE_NAME));
         List<Point> list = new ArrayList<Point>(k);
         int level = 1;
@@ -195,7 +197,7 @@ public class KNNQueryController {
             NeighbourPoint np = deque.poll();
             byte[] startRow = np.geoHashStart.toBase32().getBytes();
             byte[] endRow = np.geoHashEnd.toBase32().getBytes();
-            System.out.println("startROw: " + " " + new String(startRow) + " endRow: " + new String(endRow));
+            System.out.println("startRow: " + " " + new String(startRow) + " endRow: " + new String(endRow));
             Scan scan = new Scan();
             scan.setAttribute("KNNQueryScan", "true".getBytes());
             scan.setAttribute("startRow", startRow);
@@ -205,6 +207,7 @@ public class KNNQueryController {
             }
             ResultScanner rs = table.getScanner(scan);
             for (Result result : rs) {
+                System.out.println(new String(result.getRow()));
                 double latitudeD = CreateGlobalTable.bytes2Double(result.getValue(FAMILY_NAME, LATITUDE));
                 double longtideD = CreateGlobalTable.bytes2Double(result.getValue(FAMILY_NAME, LONGITUDE));
 //                System.out.println("latitude: " + " " + latitudeD + " " + "longitude: " + longtideD);

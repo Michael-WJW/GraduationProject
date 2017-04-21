@@ -13,7 +13,7 @@ import java.util.List;
  * Created by hadoop on 17-4-17.
  */
 public class CreateRegionTable {
-    private static final byte[] TABLE_NAME = "RegionData".getBytes();
+    private static final byte[] TABLE_NAME = "RegionDataBulkLoad".getBytes();
     private static final byte[] INDEX_FAMILY_NAME = "index".getBytes();
     private static final byte[] FAMILY_NAME = "info".getBytes();
     private static final byte[] LATITUDE = "latitude".getBytes();
@@ -44,31 +44,44 @@ public class CreateRegionTable {
     public static byte[][] get32RegionSplits() {
         return getRegionSplits(0x0800000000000000L, 0x0800000000000000L, 32);
     }
+    public static byte[][] get16RegionSplits() {
+        return getRegionSplits(0x1000000000000000L, 0x1000000000000000L, 16);
+    }
+    public static byte[][] get8RegionSplits() {
+        return getRegionSplits(0x2000000000000000L, 0x2000000000000000L, 8);
+    }
     public static void initialSplits(long initial, long increment, int numRegions) {
         for (int i = 0; i < numRegions; i ++) {
             SPLITS.add(initial);
             initial += increment;
         }
     }
+    public static void initial16Splits() {
+        initialSplits(0L, 0x1000000000000000l, 16);
+    }
     public static void initial32Splits() {
         initialSplits(0L, 0x0800000000000000l, 32);
     }
+    public static void initial8Splits() {
+        initialSplits(0L, 0x2000000000000000l, 8);
+    }
     static {
-        initial32Splits();
+        initial16Splits();
     }
 
-    public static void dataImport(Connection connection) throws IOException {
+    public static void dataImport(Connection connection, int moveBits) throws IOException {
         String className = "com.michael.coprocessor.RegionIndex";
         KNNQueryController.setCoprocessor(className, true);
 
         TableName tableName = TableName.valueOf(TABLE_NAME);
         Table table = connection.getTable(tableName);
-        String path = new String("/home/hadoop/毕设/数据/data1.txt");
+        String path = new String("/home/hadoop/毕设/数据/data200wan.txt");
         FileReader fr = new FileReader(new File(path));
         BufferedReader br = new BufferedReader(fr);
         int count = 1;
         String s = null;
         List<Put> putList = new ArrayList<Put>(5001);
+        long startTime = System.currentTimeMillis();
         while (true) {
             while ((s = br.readLine()) != null) {
                 String[] data = s.split(" ");
@@ -77,7 +90,7 @@ public class CreateRegionTable {
                 GeoHash geoHash = GeoHash.withBitPrecision(latitude, longitude, 40);
                 long bits = geoHash.getGeoHashBits();
                 long bitsCopy = bits;
-                bits >>>= 59;
+                bits >>>= moveBits;
                 byte[] rowKeyByte = (GeoHash.longToGeoHash(SPLITS.get((int)bits)) + "|" + count ++).getBytes();
                 Put put = new Put(rowKeyByte);
                 put.addColumn(FAMILY_NAME, LATITUDE, CreateGlobalTable.double2Bytes(latitude));
@@ -95,6 +108,8 @@ public class CreateRegionTable {
                 break;
             }
         }
+        long finishTime = System.currentTimeMillis();
+        System.out.println("用时: " + (finishTime - startTime));
         System.out.println("count: " + count);
     }
     public static void main(String[] args) throws IOException {
@@ -103,15 +118,15 @@ public class CreateRegionTable {
         HBaseAdmin admin = new HBaseAdmin(conf);
 
         //建表语句
-//        HTableDescriptor descriptor = new HTableDescriptor(TABLE_NAME);
-//        HColumnDescriptor family = new HColumnDescriptor(FAMILY_NAME);
-//        descriptor.addFamily(family);
-//        HColumnDescriptor index_family = new HColumnDescriptor(INDEX_FAMILY_NAME);
-//        descriptor.addFamily(index_family);
-//        byte[][] spilts = get32RegionSplits();
-//        createTable(admin, descriptor, spilts);
+        HTableDescriptor descriptor = new HTableDescriptor(TABLE_NAME);
+        HColumnDescriptor family = new HColumnDescriptor(FAMILY_NAME);
+        descriptor.addFamily(family);
+        HColumnDescriptor index_family = new HColumnDescriptor(INDEX_FAMILY_NAME);
+        descriptor.addFamily(index_family);
+        byte[][] spilts = get16RegionSplits();
+        createTable(admin, descriptor, spilts);
 
         //向表中插入数据语句
-        dataImport(connection);
+//        dataImport(connection, 61);
     }
 }

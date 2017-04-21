@@ -2,10 +2,7 @@ package com.michael.utils;
 
 import com.michael.controller.KNNQueryController;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -18,12 +15,12 @@ import java.util.List;
  * Created by hadoop on 17-4-18.
  */
 public class CreateGlobalTable {
-    private static final byte[] TABLE_NAME = "GlobalData".getBytes();
+    private static final byte[] TABLE_NAME = "GlobalDataBulkLoad".getBytes();
     private static final byte[] FAMILY_NAME = "info".getBytes();
     private static final byte[] LATITUDE = "latitude".getBytes();
     private static final byte[] LONGITUDE = "longitude".getBytes();
     private static final byte[] GEOHASHSTR = "geohashstr".getBytes();
-    private static final byte[]  INDEX_TABLE_NAME = "GlobalDataIndex".getBytes();
+    private static final byte[]  INDEX_TABLE_NAME = "IndexDataBulkLoad".getBytes();
     private static final byte[]  INDEX_TABLE_FAMILY_NAME = "null".getBytes();
 
     public static void main(String[] args) throws IOException {
@@ -35,7 +32,48 @@ public class CreateGlobalTable {
 //        createTable(admin);
 
 //        //插入数据语句
-        putTableValues(connection);
+        long startTime = System.currentTimeMillis();
+//        putTableValues(connection);
+//        long finishTime = System.currentTimeMillis();
+//        System.out.println("用时: " + (finishTime - startTime));
+        getFromTable(conf);
+        long finishTime = System.currentTimeMillis();
+        System.out.println("用时: " + (finishTime - startTime));
+    }
+    public static void getFromTableTest(Configuration conf) throws IOException {
+        HTable table = new HTable(conf, "GlobalDataBulkLoad");
+
+        Get get = new Get((1 + "").getBytes());
+        Result result = table.get(get);
+        List<Cell> cellList = result.listCells();
+        for (Cell cell : cellList) {
+            System.out.println(new String(cell.getQualifier()));
+        }
+        table.close();
+    }
+    public static void getFromTable(Configuration conf) throws IOException {
+        HTable table = new HTable(conf, "GlobalDataBulkLoad");
+        List<Get> list = new ArrayList<Get>(50000);
+        for (int i = 1; i <= 50000; i ++) {
+            Get get = new Get((i + "").getBytes());
+            list.add(get);
+        }
+        Result[] results = table.get(list);
+        BufferedWriter bw = new BufferedWriter(new FileWriter(new File("/home/hadoop/毕设/数据/1-200wan.txt"), true));
+        PrintWriter pw = new PrintWriter(bw);
+        int count = 1;
+        for (Result result : results) {
+            List<Cell> cellList = result.listCells();
+            String geohashstr = new String(cellList.get(0).getValue());
+            double latitude = bytes2Double(cellList.get(1).getValue());
+            double longitude = bytes2Double(cellList.get(2).getValue());
+            pw.println(count ++ + "\t" + latitude + "\t" + longitude + "\t" + geohashstr);
+            if (count % 1000 == 0) {
+                System.out.println(count / 1000);
+            }
+        }
+        pw.close();
+        table.close();
     }
     public static double bytes2Double(byte[] arr) {
         long value = 0;
@@ -73,12 +111,13 @@ public class CreateGlobalTable {
 
         TableName tableName = TableName.valueOf(TABLE_NAME);
         Table table = connection.getTable(tableName);
-        String path = new String("/home/hadoop/毕设/数据/data1.txt");
+        String path = new String("/home/hadoop/毕设/数据/data200wan.txt");
         FileReader fr = new FileReader(new File(path));
         BufferedReader br = new BufferedReader(fr);
         int count = 1;
+        int k = 1;
         String s = null;
-        List<Put> putList = new ArrayList<Put>(5001);
+        List<Put> putList = new ArrayList<Put>(10001);
         while (true) {
             while ((s = br.readLine()) != null) {
                 String[] data = s.split(" ");
@@ -90,8 +129,8 @@ public class CreateGlobalTable {
                 put.addColumn(FAMILY_NAME, LONGITUDE, longitude);
                 put.addColumn(FAMILY_NAME, GEOHASHSTR, geohashstr);
                 putList.add(put);
-                if (putList.size() == 5000) {
-                    System.out.println("size: " + putList.size());
+                if (putList.size() == 10000) {
+                    System.out.println("k: " + k ++);
                     break;
                 }
             }

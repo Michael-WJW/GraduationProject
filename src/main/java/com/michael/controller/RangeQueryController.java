@@ -28,19 +28,22 @@ import java.util.*;
 public class RangeQueryController {
     private static Configuration conf = null;
     private static Connection connection;
-    private static final byte[] TABLE_NAME = "GlobalData".getBytes();
+    private static final byte[] TABLE_NAME = "GlobalDataBulkLoad".getBytes();
     private static final byte[] REGION_TABLE_NAME = "RegionData".getBytes();
     private static final byte[] FAMILY_NAME = "info".getBytes();
     private static final byte[] LATITUDE = "latitude".getBytes();
     private static final byte[] LONGITUDE = "longitude".getBytes();
     static {
         conf = HBaseConfiguration.create();
+        conf.setInt("hbase.rpc.timeout",180000);
+        conf.setInt("hbase.client.scanner.timeout.period",180000);
         try {
             connection = ConnectionFactory.createConnection(conf);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+    //起始经纬度：40.8, 30.8 结束经纬度: 60.9, 60.5
     //type: 1 无索引EndPoint 2 全局索引 3 局部索引
     @RequestMapping(value = "/controll/RangeQuery", method = RequestMethod.POST)
     public @ResponseBody Map<String, Object> rangeQuery(double startLatitude, double startLongitude,
@@ -88,6 +91,7 @@ public class RangeQueryController {
             actualTableName = REGION_TABLE_NAME;
         }
         List<Point> list = new ArrayList<Point>();
+        System.out.println("table name: " + actualTableName);
         TableName tableName = TableName.valueOf(actualTableName);
         Table table = connection.getTable(tableName);
         Deque<GeoHashRange> deque = RangeQuery.query(startLatitude, startLongitude, endLatitude, endLongitude);
@@ -99,11 +103,14 @@ public class RangeQueryController {
             scan.setAttribute("RangeQueryScan", "true".getBytes());
             scan.setAttribute("startRow", leftDown.getBytes());
             scan.setAttribute("endRow", rightUp.getBytes());
+            System.out.println("startRow: " + leftDown + " endRow: " + rightUp);
+
             if (range1.equals("Global")) {
                 scan.setAttribute("uuid", GenUUID.getUUID().getBytes());
             }
 //            System.out.println("leftDown: " + leftDown + "  " + "rightUp: " + rightUp + " count: " + count);
             ResultScanner rs = table.getScanner(scan);
+            int count = 0;
             for (Result result : rs) {
 //                System.out.println(result.getValue(FAMILY_NAME,LATITUDE));
 //                System.out.println(result.getValue(FAMILY_NAME,LONGITUDE));
@@ -111,6 +118,7 @@ public class RangeQueryController {
 //                    System.out.println("qualifier: " + new String(cell.getQualifier()));
 //                    System.out.println("row: " + new String(cell.getRow()));
 //                }
+                System.out.println("count: " + count ++ + "  " + new String(result.getRow()));
                 double latitudeD = CreateGlobalTable.bytes2Double(result.getValue(FAMILY_NAME, LATITUDE));
                 double longtideD = CreateGlobalTable.bytes2Double(result.getValue(FAMILY_NAME, LONGITUDE));
                 if (startLatitude < latitudeD && latitudeD < endLatitude &&
