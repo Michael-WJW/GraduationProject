@@ -3,10 +3,7 @@ package com.michael.controller;
 import com.michael.endPointCoprocessor.RangeQueryProto;
 import com.michael.model.GeoHashRange;
 import com.michael.model.Point;
-import com.michael.utils.CreateGlobalTable;
-import com.michael.utils.GenUUID;
-import com.michael.utils.GeoHash;
-import com.michael.utils.RangeQuery;
+import com.michael.utils.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
@@ -29,7 +26,7 @@ public class RangeQueryController {
     private static Configuration conf = null;
     private static Connection connection;
     private static final byte[] TABLE_NAME = "GlobalDataBulkLoad".getBytes();
-    private static final byte[] REGION_TABLE_NAME = "RegionData".getBytes();
+    private static final byte[] REGION_TABLE_NAME = "RegionDataBulkLoad".getBytes();
     private static final byte[] FAMILY_NAME = "info".getBytes();
     private static final byte[] LATITUDE = "latitude".getBytes();
     private static final byte[] LONGITUDE = "longitude".getBytes();
@@ -91,7 +88,7 @@ public class RangeQueryController {
             actualTableName = REGION_TABLE_NAME;
         }
         List<Point> list = new ArrayList<Point>();
-        System.out.println("table name: " + actualTableName);
+        System.out.println("table name: " + new String(actualTableName));
         TableName tableName = TableName.valueOf(actualTableName);
         Table table = connection.getTable(tableName);
         Deque<GeoHashRange> deque = RangeQuery.query(startLatitude, startLongitude, endLatitude, endLongitude);
@@ -106,7 +103,15 @@ public class RangeQueryController {
             System.out.println("startRow: " + leftDown + " endRow: " + rightUp);
 
             if (range1.equals("Global")) {
-                scan.setAttribute("uuid", GenUUID.getUUID().getBytes());
+                scan.setStartRow("20".getBytes());
+                scan.setStopRow("20".getBytes());
+//                System.out.println("设置start stop");
+//                scan.setAttribute("uuid", GenUUID.getUUID().getBytes());
+            }  else if (range1.equals("Region")) {
+                scan.setStartRow((CreateRegionTable.getGeohashInitialStrByLong(range.leftDown) + "-" + leftDown).getBytes());
+                scan.setStopRow((CreateRegionTable.getGeohashInitialStrByLong(range.rightUp) + "-" +
+                        rightUp + "@").getBytes());
+                System.out.println("set region start stop row");
             }
 //            System.out.println("leftDown: " + leftDown + "  " + "rightUp: " + rightUp + " count: " + count);
             ResultScanner rs = table.getScanner(scan);
@@ -118,15 +123,18 @@ public class RangeQueryController {
 //                    System.out.println("qualifier: " + new String(cell.getQualifier()));
 //                    System.out.println("row: " + new String(cell.getRow()));
 //                }
-                System.out.println("count: " + count ++ + "  " + new String(result.getRow()));
+//                System.out.println("count: " + count ++ + "  " + new String(result.getRow()));
                 double latitudeD = CreateGlobalTable.bytes2Double(result.getValue(FAMILY_NAME, LATITUDE));
                 double longtideD = CreateGlobalTable.bytes2Double(result.getValue(FAMILY_NAME, LONGITUDE));
                 if (startLatitude < latitudeD && latitudeD < endLatitude &&
                         startLongitude < longtideD && longtideD < endLongitude) {
                     Point p = new Point(latitudeD, longtideD);
+                    System.out.println("rowkey: " + new String(result.getRow())
+                        + " latitude: " + latitudeD + " longitude: " + longtideD);
                     list.add(p);
                 }
             }
+            System.out.println("---------------------------------------");
             rs.close();
         }
 //        System.out.println(list.size());

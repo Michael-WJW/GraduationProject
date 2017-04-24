@@ -5,6 +5,7 @@ import com.michael.endPointCoprocessor.KNNQueryProto;
 import com.michael.model.NeighbourPoint;
 import com.michael.model.Point;
 import com.michael.utils.*;
+import com.sun.org.apache.xerces.internal.impl.xs.SchemaNamespaceSupport;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -37,12 +38,13 @@ public class KNNQueryController {
     private static Connection connection;
     private static HBaseAdmin admin;
     private static final byte[] TABLE_NAME = "GlobalDataBulkLoad".getBytes();
-    private static final byte[] REGION_TABLE_NAME = "RegionData".getBytes();
+    private static final byte[] REGION_TABLE_NAME = "RegionDataBulkLoad".getBytes();
     private static final byte[] FAMILY_NAME = "info".getBytes();
     private static final byte[] GEOHASHSTR = "geohashstr".getBytes();
     private static final byte[] LATITUDE = "latitude".getBytes();
     private static final byte[] LONGITUDE = "longitude".getBytes();
-    private static final Path JARPATH = new Path("hdfs:///HBaseSeondIndexServer19.jar");
+    private static final Path JARPATH = new Path("hdfs:///HBaseSeondIndexServer32.jar");
+
     static {
         conf = HBaseConfiguration.create();
         conf.setInt("hbase.rpc.timeout",180000);
@@ -203,7 +205,12 @@ public class KNNQueryController {
             scan.setAttribute("startRow", startRow);
             scan.setAttribute("endRow", endRow);
             if (range.equals("Global")) {
-                scan.setAttribute("uuid", GenUUID.getUUID().getBytes());
+                scan.setStartRow("20".getBytes());
+                scan.setStopRow("20".getBytes());
+            } else if (range.equals("Region")) {
+                scan.setStartRow((CreateRegionTable.getGeohashInitialStr(np.geoHashStart) + "-" + np.geoHashStart.toBase32()).getBytes());
+                scan.setStopRow((CreateRegionTable.getGeohashInitialStr(np.geoHashEnd) + "-" +
+                    np.geoHashEnd.toBase32() + "@").getBytes());
             }
             ResultScanner rs = table.getScanner(scan);
             for (Result result : rs) {

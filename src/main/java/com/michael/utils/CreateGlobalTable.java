@@ -21,59 +21,15 @@ public class CreateGlobalTable {
     private static final byte[] LONGITUDE = "longitude".getBytes();
     private static final byte[] GEOHASHSTR = "geohashstr".getBytes();
     private static final byte[]  INDEX_TABLE_NAME = "IndexDataBulkLoad".getBytes();
-    private static final byte[]  INDEX_TABLE_FAMILY_NAME = "null".getBytes();
+    private static final byte[]  INDEX_TABLE_FAMILY_NAME = "info".getBytes();
 
     public static void main(String[] args) throws IOException {
-        Configuration conf = HBaseConfiguration.create();
-        Connection connection = ConnectionFactory.createConnection(conf);
-        HBaseAdmin admin = new HBaseAdmin(conf);
+//        Configuration conf = HBaseConfiguration.create();
+//        Connection connection = ConnectionFactory.createConnection(conf);
+//        HBaseAdmin admin = new HBaseAdmin(conf);
+//        createGlobalTable(admin);//创建数据表　32个region
+//        createIndexTable(admin);//创建全局索引表 16个region
 
-//        //建表语句
-//        createTable(admin);
-
-//        //插入数据语句
-        long startTime = System.currentTimeMillis();
-//        putTableValues(connection);
-//        long finishTime = System.currentTimeMillis();
-//        System.out.println("用时: " + (finishTime - startTime));
-        getFromTable(conf);
-        long finishTime = System.currentTimeMillis();
-        System.out.println("用时: " + (finishTime - startTime));
-    }
-    public static void getFromTableTest(Configuration conf) throws IOException {
-        HTable table = new HTable(conf, "GlobalDataBulkLoad");
-
-        Get get = new Get((1 + "").getBytes());
-        Result result = table.get(get);
-        List<Cell> cellList = result.listCells();
-        for (Cell cell : cellList) {
-            System.out.println(new String(cell.getQualifier()));
-        }
-        table.close();
-    }
-    public static void getFromTable(Configuration conf) throws IOException {
-        HTable table = new HTable(conf, "GlobalDataBulkLoad");
-        List<Get> list = new ArrayList<Get>(50000);
-        for (int i = 1; i <= 50000; i ++) {
-            Get get = new Get((i + "").getBytes());
-            list.add(get);
-        }
-        Result[] results = table.get(list);
-        BufferedWriter bw = new BufferedWriter(new FileWriter(new File("/home/hadoop/毕设/数据/1-200wan.txt"), true));
-        PrintWriter pw = new PrintWriter(bw);
-        int count = 1;
-        for (Result result : results) {
-            List<Cell> cellList = result.listCells();
-            String geohashstr = new String(cellList.get(0).getValue());
-            double latitude = bytes2Double(cellList.get(1).getValue());
-            double longitude = bytes2Double(cellList.get(2).getValue());
-            pw.println(count ++ + "\t" + latitude + "\t" + longitude + "\t" + geohashstr);
-            if (count % 1000 == 0) {
-                System.out.println(count / 1000);
-            }
-        }
-        pw.close();
-        table.close();
     }
     public static double bytes2Double(byte[] arr) {
         long value = 0;
@@ -90,21 +46,38 @@ public class CreateGlobalTable {
         }
         return byteRet;
     }
-    public static void createTable(HBaseAdmin admin) throws IOException {
-        if (!admin.tableExists(TABLE_NAME) && !admin.tableExists(INDEX_TABLE_NAME)) {
-            HTableDescriptor tableDescriptor = new HTableDescriptor(TABLE_NAME);
-            HColumnDescriptor family = new HColumnDescriptor(FAMILY_NAME);
-            tableDescriptor.addFamily(family);
-            admin.createTable(tableDescriptor);
-            //setting “hbase.hregion.max.filesize” to 100GB
-//            tableDescriptor.setRegionSplitPolicyClassName(ConstantSizeRegionSplitPolicy.class.getName());
-            HTableDescriptor indexTableDescriptor = new HTableDescriptor(INDEX_TABLE_NAME);
-            HColumnDescriptor indexFamily = new HColumnDescriptor(INDEX_TABLE_FAMILY_NAME);
-            indexTableDescriptor.addFamily(indexFamily);
-            admin.createTable(indexTableDescriptor);
+    public static void createGlobalTable(HBaseAdmin admin) throws IOException {
+        HTableDescriptor tableDescriptor = new HTableDescriptor(TABLE_NAME);
+        HColumnDescriptor family = new HColumnDescriptor(FAMILY_NAME);
+        tableDescriptor.addFamily(family);
+        byte[][] spilts = new byte[31][];
+        for (int i = 1; i <= 31; i ++) {
+            if (i >= 10) {
+                spilts[i - 1] = (i + "").getBytes();
+            } else {
+                spilts[i - 1] = ("0" + i).getBytes();
+            }
+        }
+        createGlobalTable(admin, tableDescriptor, spilts);
+    }
+    public static void createIndexTable(HBaseAdmin admin) throws IOException {
+        HTableDescriptor tableDescriptor = new HTableDescriptor(INDEX_TABLE_NAME);
+        HColumnDescriptor family = new HColumnDescriptor(INDEX_TABLE_FAMILY_NAME);
+        tableDescriptor.addFamily(family);
+        byte[][] spilts = CreateRegionTable.get16RegionSplits();
+        createGlobalTable(admin, tableDescriptor, spilts);
+    }
+    public static boolean createGlobalTable(Admin admin, HTableDescriptor table, byte[][] splits)
+            throws IOException {
+        try {
+            admin.createTable(table, splits);
+            return true;
+        } catch (TableExistsException e) {
+//            logger.info("table " + table.getNameAsString() + " already exists");
+            // the table already exists...
+            return false;
         }
     }
-
     public static void putTableValues(Connection connection) throws IOException {
         String className = "com.michael.coprocessor.GlobalIndex";
         KNNQueryController.setCoprocessor(className, false);

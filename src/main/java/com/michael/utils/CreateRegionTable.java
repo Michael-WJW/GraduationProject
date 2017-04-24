@@ -27,8 +27,6 @@ public class CreateRegionTable {
             admin.createTable(table, splits);
             return true;
         } catch (TableExistsException e) {
-//            logger.info("table " + table.getNameAsString() + " already exists");
-            // the table already exists...
             return false;
         }
     }
@@ -66,9 +64,17 @@ public class CreateRegionTable {
         initialSplits(0L, 0x2000000000000000l, 8);
     }
     static {
-        initial16Splits();
+        initial32Splits();
     }
-
+    public static String getGeohashInitialStr(GeoHash geohash) {
+        long bits = geohash.getGeoHashBits();
+        bits >>>= 59;
+        return GeoHash.longToGeoHash(SPLITS.get((int)bits));
+    }
+    public static String getGeohashInitialStrByLong(long geohashBits) {
+        geohashBits >>>= 59;
+        return GeoHash.longToGeoHash(SPLITS.get((int)geohashBits));
+    }
     public static void dataImport(Connection connection, int moveBits) throws IOException {
         String className = "com.michael.coprocessor.RegionIndex";
         KNNQueryController.setCoprocessor(className, true);
@@ -112,21 +118,21 @@ public class CreateRegionTable {
         System.out.println("用时: " + (finishTime - startTime));
         System.out.println("count: " + count);
     }
-    public static void main(String[] args) throws IOException {
-        Configuration conf = HBaseConfiguration.create();
-        Connection connection = ConnectionFactory.createConnection(conf);
-        HBaseAdmin admin = new HBaseAdmin(conf);
-
-        //建表语句
-        HTableDescriptor descriptor = new HTableDescriptor(TABLE_NAME);
-        HColumnDescriptor family = new HColumnDescriptor(FAMILY_NAME);
-        descriptor.addFamily(family);
-        HColumnDescriptor index_family = new HColumnDescriptor(INDEX_FAMILY_NAME);
-        descriptor.addFamily(index_family);
-        byte[][] spilts = get16RegionSplits();
-        createTable(admin, descriptor, spilts);
-
-        //向表中插入数据语句
-//        dataImport(connection, 61);
-    }
+//    public static void main(String[] args) throws IOException {
+//        Configuration conf = HBaseConfiguration.create();
+//        Connection connection = ConnectionFactory.createConnection(conf);
+//        HBaseAdmin admin = new HBaseAdmin(conf);
+//
+//        //建表语句
+//        HTableDescriptor descriptor = new HTableDescriptor(TABLE_NAME);
+//        HColumnDescriptor family = new HColumnDescriptor(FAMILY_NAME);
+//        descriptor.addFamily(family);
+//        HColumnDescriptor index_family = new HColumnDescriptor(INDEX_FAMILY_NAME);
+//        descriptor.addFamily(index_family);
+//        byte[][] spilts = get32RegionSplits();
+//        createTable(admin, descriptor, spilts);
+//
+//        //向表中插入数据语句
+////        dataImport(connection, 61);
+//    }
 }
